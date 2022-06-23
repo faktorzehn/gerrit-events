@@ -3,7 +3,6 @@ package com.sonymobile.tools.gerrit.gerritevents;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import net.sf.json.JSONObject;
-import org.apache.http.auth.Credentials;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,22 +21,13 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 
 /**
+ * Test {@link GerritQueryHandlerHttp}:
  * {@link GerritQueryHandlerHttpTest#url}, {@link GerritQueryHandlerHttpTest#port}
  *  {@link GerritQueryHandlerHttpTest#username} and {@link GerritQueryHandlerHttpTest#password}
  *  can be changed to test on a real gerrit server. (instead of on the localhost-mock)
+ *  @author Manuel Mühlberger &lt;Manuel.Muehlberger@faktorzehn.de&gt;
  */
 public class GerritQueryHandlerHttpTest {
-
-    /*
-    -schauen, ob die parameter richtig in die urls umgewandelt werden
-    -schauen, ob die Antworten richtig empfangen werden, XSSI-Chars entfernt werden und als List<JSONObject> zurück-
-        gegeben werden
-    -beide setzen korrekte Credentials vorraus
-    -example: https://www.swtestacademy.com/wiremock-junit-5-rest-assured/
-    -auth: https://wiremock.org/docs/request-matching/
-
-    -antwort von server anschauen
-     */
 
     /**
      * Logger instance.
@@ -49,17 +39,11 @@ public class GerritQueryHandlerHttpTest {
 
     private final String url = "http://localhost:" + port;
 
-    private final int statusOk = 200;
-    private final int statusBadRequest = 400;
-    private final int statusBadCredentials = 401;
-    private final int statusNotFound = 404;
     private final int statusRandomCode = 501;
 
     private final String username = "user123";
 
     private final String password = "password123";
-
-    private Credentials credentials;
 
     private GerritQueryHandlerHttp gerritQueryHandlerHTTP;
 
@@ -69,7 +53,7 @@ public class GerritQueryHandlerHttpTest {
      *initialise SUT
      */
     private void setupQueryHandlerHttp() {
-        GerritQueryHandlerHttp.Credential credential = new GerritQueryHandlerHttp.Credential() {
+        Credential credential = new Credential() {
             @Override
             public Principal getUserPrincipal() {
                 return new Principal() {
@@ -109,33 +93,6 @@ public class GerritQueryHandlerHttpTest {
     }
 
     /**
-     * debug.
-     */
-    public void debug() {
-        //debugStub();
-        setupQueryHandlerHttp();
-        /*
-        given().auth().preemptive().basic(credentials.getUserPrincipal().getName(), credentials.getPassword())
-            .when().get("https://gerrit.faktorzehn.de/a/changes/?q=limit%3A1&o=ALL_REVISIONS&o=CURRENT_REVI
-            SION&o=CURRENT_FILES&o=CURRENT_COMMITS&o=MESSAGES").then()
-            .assertThat().statusCode(200);
-         */
-
-/*
-        try {
-            Response response = gerritQueryHandlerHTTP.runQuery("limit:2", true, true, true, true, true);
-            System.out.println();
-            String s = response.body().asPrettyString();
-            System.out.println(s);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (GerritQueryException e) {
-            e.printStackTrace();
-        }
- */
-    }
-
-    /**
      * setup stub for {@link GerritQueryHandlerHttpTest#urlConversionTest()}, which can be found at url + query.
      * @param query a String added to url
      */
@@ -144,7 +101,7 @@ public class GerritQueryHandlerHttpTest {
         wireMockServer.stubFor(get(urlEqualTo(query))
             .withBasicAuth(username, password)
             .willReturn(aResponse().withHeader("Content-Type", "text/plain")
-                .withStatus(statusOk)
+                .withStatus(GerritQueryHandlerHttp.STATUS_OK)
                 .withBody(")]}'\n []")));
     }
 
@@ -157,7 +114,7 @@ public class GerritQueryHandlerHttpTest {
         wireMockServer.stubFor(get(urlEqualTo("/a/changes/?q=x&o=ALL_REVISIONS&o=CURRENT_REVISION"))
             .withBasicAuth(username, password)
             .willReturn(aResponse().withHeader("Content-Type", "text/plain")
-                .withStatus(statusOk)
+                .withStatus(GerritQueryHandlerHttp.STATUS_OK)
                 .withBodyFile(fileName)));
     }
 
@@ -178,7 +135,7 @@ public class GerritQueryHandlerHttpTest {
      * see {@link GerritQueryHandlerHttpTest#urlConversionTest()}.
      * @throws Exception when something wrong
      */
-    private void urlConversionTest1True() throws Exception {
+    private void urlConversionTest1Success() throws Exception {
         setupStubForUrlConversion("/a/changes/?q=test");
         gerritQueryHandlerHTTP.queryJava("test", false, false, false, false, false);
 
@@ -207,7 +164,7 @@ public class GerritQueryHandlerHttpTest {
      * see {@link GerritQueryHandlerHttpTest#urlConversionTest()}.
      * @throws Exception when something wrong
      */
-    private void urlConversionTest2True() throws Exception {
+    private void urlConversionTest2Success() throws Exception {
         setupStubForUrlConversion("/a/changes/?q=limit%3A1&o=ALL_REVISIONS&o=CURRENT_REVISION");
         gerritQueryHandlerHTTP.queryJava("limit:1", true, true, false, false, false);
 
@@ -246,7 +203,7 @@ public class GerritQueryHandlerHttpTest {
      * see {@link GerritQueryHandlerHttpTest#urlConversionTest()}.
      * @throws Exception when something wrong
      */
-    private void urlConversionTest3True() throws Exception {
+    private void urlConversionTest3Success() throws Exception {
         setupStubForUrlConversion("/a/changes/?q=limit%3A1&o=ALL_REVISIONS&o=CURRENT_REVISION&o=CURRENT_FILES");
         gerritQueryHandlerHTTP.queryJava("limit:1", true, true, true, false, false);
 
@@ -283,7 +240,7 @@ public class GerritQueryHandlerHttpTest {
      * see {@link GerritQueryHandlerHttpTest#urlConversionTest()}.
      * @throws Exception when something wrong
      */
-    private void urlConversionTest4True() throws Exception {
+    private void urlConversionTest4Success() throws Exception {
         setupStubForUrlConversion("/a/changes/?q=limit%3A1&o=ALL_REVISIONS&o=CURRENT_REVISION&o=CURRENT_FILES"
             + "&o=CURRENT_COMMIT");
         gerritQueryHandlerHTTP.queryJava("limit:1", true, true, true, true, false);
@@ -308,7 +265,7 @@ public class GerritQueryHandlerHttpTest {
      * see {@link GerritQueryHandlerHttpTest#urlConversionTest()}.
      * @throws Exception when something wrong
      */
-    private void urlConversionTest5True() throws Exception {
+    private void urlConversionTest5Success() throws Exception {
         setupStubForUrlConversion("/a/changes/?q=limit%3A1&o=ALL_REVISIONS&o=CURRENT_REVISION&o=CURRENT_FILES"
             + "&o=CURRENT_COMMIT&o=MESSAGES");
         gerritQueryHandlerHTTP.queryJava("limit:1", true, true, true, true, true);
@@ -321,11 +278,11 @@ public class GerritQueryHandlerHttpTest {
      */
     @Test
     public void urlConversionTest() throws Exception {
-        urlConversionTest1True();
-        urlConversionTest2True();
-        urlConversionTest3True();
-        urlConversionTest4True();
-        urlConversionTest5True();
+        urlConversionTest1Success();
+        urlConversionTest2Success();
+        urlConversionTest3Success();
+        urlConversionTest4Success();
+        urlConversionTest5Success();
     }
 
     /**
@@ -354,8 +311,6 @@ public class GerritQueryHandlerHttpTest {
         List<String> response1 = gerritQueryHandlerHTTP.queryJson("x");
         assertEquals("{\"Id\":\"value1\"}", response1.get(0));
         assertEquals("{\"Id\":\"value2\"}", response1.get(1));
-
-
     }
 
     /**
@@ -365,7 +320,7 @@ public class GerritQueryHandlerHttpTest {
     public void invalidRequestsThrowsTest() {
 
         //Statuscode 200
-        setupStubForInvalidRequests(statusOk);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_OK);
         try {
             gerritQueryHandlerHTTP.queryJava("x");
         } catch (Exception e) {
@@ -373,7 +328,7 @@ public class GerritQueryHandlerHttpTest {
         }
 
         //Statuscode 400
-        setupStubForInvalidRequests(statusBadRequest);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_BAD_REQUEST);
         //assertThrows(IOException.class, () -> gerritQueryHandlerHTTP.queryJava("x"));
         try {
             gerritQueryHandlerHTTP.queryJava("x");
@@ -385,7 +340,7 @@ public class GerritQueryHandlerHttpTest {
         }
 
         //Statuscode 401
-        setupStubForInvalidRequests(statusBadCredentials);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_BAD_CREDENTIALS);
         //assertThrows(IOException.class, () -> gerritQueryHandlerHTTP.queryJava("x"));
         try {
             gerritQueryHandlerHTTP.queryJava("x");
@@ -397,7 +352,7 @@ public class GerritQueryHandlerHttpTest {
         }
 
         //Statuscode 404
-        setupStubForInvalidRequests(statusNotFound);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_NOT_FOUND);
         //assertThrows(IOException.class, () -> gerritQueryHandlerHTTP.queryJava("x"));
         try {
             gerritQueryHandlerHTTP.queryJava("x");
