@@ -5,59 +5,45 @@ import com.sonymobile.tools.gerrit.gerritevents.ssh.SshException;
 import io.restassured.response.Response;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import net.sf.json.JSONSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
 
-
-
 /**
- * This class helps you call gerrit query to search for patch-sets.
+ * This class helps you call gerrit query to search for patch-sets. instead of using SSH, it calls Gerrit's Rest api
  *
- * @author Robert Sandell &lt;robert.sandell@sonyericsson.com&gt;
+ * @author Manuel Mühlberger &lt;Manuel.Muehlberger@faktorzehn.de&gt;
  */
 public class GerritQueryHandlerHttp {
 
-  /**
-   * The interface used to store Credentials.
-   */
-  public interface Credential {
-    /**
-     * The user principal.
-     * @return the password
-     */
-    Principal getUserPrincipal();
-
-    /**
-     * the password.
-     * @return the password
-     */
-    String getPassword();
-  }
-
-  private final int statusOk = 200;
-  private final int statusBadRequest = 400;
-  private final int statusBadCredentials = 401;
-  private final int statusNotFound = 404;
+  static final int statusOk = 200;
+  static final int statusBadRequest = 400;
+  static final int statusBadCredentials = 401;
+  static final int statusNotFound = 404;
 
   /**
    * Logger instance.
    * Set protected to allow it  to be used in subclasses.
    */
   protected static final Logger logger = LoggerFactory.getLogger(GerritQueryHandlerHttp.class);
+
+  private final String getAllRevisions = "&o=ALL_REVISIONS";
+  private final String getCurrentRevision = "&o=CURRENT_REVISION";
+  private final String getCurrentFiles = "&o=CURRENT_FILES";
+  private final String getCurrentCommit = "&o=CURRENT_COMMIT";
+  private final String getMessages = "&o=MESSAGES";
+
   /**
    * The base of the query HTTP command to send to Gerrit.
    */
-  public static final String QUERY_COMMAND = "gerrit query";
-  //https://gerrit-review.googlesource.com/Documentation/cmd-query.html
   private final String httpBaseUrl;
   private final String proxy;
   private final Credential credential;
@@ -74,7 +60,6 @@ public class GerritQueryHandlerHttp {
     this.httpBaseUrl = frontEndUrl;
     this.credential = credential;
     this.proxy = gerritProxy;
-
   }
 
   /**
@@ -180,15 +165,9 @@ public class GerritQueryHandlerHttp {
 
     List<JSONObject> list = new ArrayList<>();
 
-    runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, getComments,
-        new GerritQueryHandlerHttp.LineVisitor() {
-          @Override
-          public void visit(String line) {
-            JSONObject json = (JSONObject)JSONSerializer.toJSON(line.trim());
-            list.add(json);
-          }
-        });
+    Consumer<JSONObject> lineVisitor = list::add;
 
+    runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, getComments, lineVisitor);
     return list;
   }
 
@@ -288,13 +267,9 @@ public class GerritQueryHandlerHttp {
 
     List<String> list = new ArrayList<>();
 
-    runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, false,
-        new GerritQueryHandlerHttp.LineVisitor() {
-          @Override
-          public void visit(String line) {
-            list.add(line);
-          }
-        });
+    Consumer<JSONObject> lineVisitor = (JSONObject o) -> list.add(o.toString());
+
+    runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, false, lineVisitor);
     return list;
   }
 
@@ -320,7 +295,7 @@ public class GerritQueryHandlerHttp {
    * @throws IOException          for some other IO problem.
    */
   private void runQuery(String queryString, boolean getPatchSets, boolean getCurrentPatchSet, boolean getFiles,
-                            boolean getCommitMessage, boolean getComments, LineVisitor visitor)
+                            boolean getCommitMessage, boolean getComments, Consumer<JSONObject> lineVisitor)
       throws GerritQueryException, IOException {
 
 
@@ -333,35 +308,34 @@ public class GerritQueryHandlerHttp {
 
     if (getPatchSets) {
       //ALL_REVISIONS: describe all revisions, not just current.
-      str.append("&o=ALL_REVISIONS");
+      str.append(getAllRevisions);
     }
     if (getCurrentPatchSet) {
       //.append(" --current-patch-set");
       //CURRENT_REVISION: describe the current revision (patch set) of the change, including the commit SHA-1 and URLs
       //to fetch from.
-      str.append("&o=CURRENT_REVISION");
+      str.append(getCurrentRevision);
     }
     if (getFiles && (getCurrentPatchSet || getPatchSets)) {
       //str.append(" --files");
       //CURRENT_FILES: list files modified by the commit and magic files, including basic line counts inserted/deleted
       //per file.
       // Only valid when the CURRENT_REVISION or ALL_REVISIONS option is selected.
-      str.append("&o=CURRENT_FILES");
+      str.append(getCurrentFiles);
     }
     if (getCommitMessage && (getCurrentPatchSet || getPatchSets)) {
       //str.append(" --commit-message");
       //CURRENT_COMMITS: parse and output all header fields from the commit object, including message.
       // Only valid when the CURRENT_REVISION or ALL_REVISIONS option is selected.
-      str.append("&o=CURRENT_COMMIT");
+      str.append(getCurrentCommit);
     }
     if (getComments) {
       //str.append(" --comments");
       //MESSAGES: include messages associated with the change.
-      str.append("&o=MESSAGES");
+      str.append(getMessages);
     }
 
     logger.debug("sending: " + str);
-    //System.out.println("sending: " + str);
 
     Response response = given().auth().preemptive()
                         .basic(credential.getUserPrincipal().getName(), credential.getPassword())
@@ -391,87 +365,14 @@ public class GerritQueryHandlerHttp {
         throw new IOException("Error connecting to \"" + httpBaseUrl + "\"! (" + response.statusCode() + ")");
     }
 
-    //response.body().print();
-
     //removing XSSI-Chars
     String body = response.body().asString().split("\\r?\\n|\\r")[1];
 
     JSONArray jsonArray = JSONArray.fromObject(body);
 
     for (int i = 0; i < jsonArray.size(); i++) {
-      visitor.visit(jsonArray.getString(i));
+      lineVisitor.accept(jsonArray.getJSONObject(i));
     }
-
-      /*
-            Response response = given().auth().basic(credentials.getUserPrincipal().toString(),
-            credentials.getPassword()). //authentication: https://www.baeldung.com/rest-assured-authentication
-                    //config(config).                                                                 //configuration
-                            when().get(str.toString());                                     //url
-
-            logger.debug("\n Status received => \n " + response.getStatusLine());
-            logger.debug("\n Response => \n " + response.prettyPrint());
-
-
-
-            // Specify the base URL to the RESTful web service
-            RestAssured.baseURI = "https://demoqa.com/BookStore/v1/Books";
-            // Get the RequestSpecification of the request to be sent to the server.
-            RequestSpecification httpRequest = RestAssured.given();
-            // specify the method type (GET) and the parameters if any.
-            //In this case the request does not take any parameters
-            Response response1 = httpRequest.request(Method.GET, "");
-            // Print the status and message body of the response received from the server
-            System.out.println("Status received => " + response.getStatusLine());
-            System.out.println("Response=>" + response.prettyPrint());
-
-
-            HttpGet httpGet = new HttpGet(frontEndUrl);
-            httpGet.setHeader("", "");
-
-            CloseableHttpClient httpClient = getConnection();
-
-            HttpPost httpPost = new HttpPost(frontEndUrl);         //create the post to send
-            httpPost.setEntity(new StringEntity(str.toString())); //add body to request
-
-            CloseableHttpResponse httpResponse = httpClient.execute(httpPost);
-            String response2 = IOUtils.toString(httpResponse.getEntity().getContent(), "UTF-8");
-
-            //check if error occurred
-            if (httpResponse.getStatusLine().getStatusCode() != HttpStatus.SC_OK) {
-                logger.error("Gerrit response: {}", httpResponse.getStatusLine().getReasonPhrase());
-                logger.debug("ERROR Gerrit response: " + httpResponse.getStatusLine().getReasonPhrase());
-            }
-            else
-            {
-                //parse the response
-                Scanner scanner = new Scanner(response2);
-                while (scanner.hasNextLine()) {
-                    String line = scanner.nextLine();
-                    logger.trace("Incoming line: {}", line);
-                    visitor.visit(line);
-                }
-                logger.trace("Closing reader.");
-                scanner.close();
-            }
-
-        } catch (Exception e) {
-            logger.error("Failed to submit result to Gerrit", e);
-        }
-  */
-  }
-
-
-  /**
-   * Internal visitor for handling a line of text.
-   * Used by .
-   */
-  interface LineVisitor {
-    /**
-     * Visits a line of query result.
-     *
-     * @param line the line.
-     */
-    void visit(String line);
   }
 
   @Override
@@ -492,6 +393,4 @@ public class GerritQueryHandlerHttp {
   public int hashCode() {
     return Objects.hash(httpBaseUrl, proxy, credential);
   }
-
-
 }
