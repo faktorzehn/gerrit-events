@@ -6,7 +6,7 @@ import java.security.Principal;
  * The interface which GerritQueryHandlerHttp uses for authentication
  */
 public interface Credential {
-  
+
   /**
    * The user principal.
    * @return the password

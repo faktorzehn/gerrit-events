@@ -1,6 +1,5 @@
 package com.sonymobile.tools.gerrit.gerritevents;
 
-import com.sonymobile.tools.gerrit.gerritevents.rest.RestConnectionConfig;
 import com.sonymobile.tools.gerrit.gerritevents.ssh.SshException;
 import io.restassured.response.Response;
 import net.sf.json.JSONArray;
@@ -13,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
 
@@ -24,22 +22,21 @@ import static io.restassured.RestAssured.given;
  */
 public class GerritQueryHandlerHttp {
 
-  static final int statusOk = 200;
-  static final int statusBadRequest = 400;
-  static final int statusBadCredentials = 401;
-  static final int statusNotFound = 404;
+  static final int STATUS_OK = 200;
+  static final int STATUS_BAD_REQUEST = 400;
+  static final int STATUS_BAD_CREDENTIALS = 401;
+  static final int STATUS_NOT_FOUND = 404;
+  private final String GET_ALL_REVISIONS = "&o=ALL_REVISIONS";
+  private final String GET_CURRENT_REVISION = "&o=CURRENT_REVISION";
+  private final String GET_CURRENT_FILES = "&o=CURRENT_FILES";
+  private final String GET_CURRENT_COMMIT = "&o=CURRENT_COMMIT";
+  private final String GET_MESSAGES = "&o=MESSAGES";
 
   /**
    * Logger instance.
    * Set protected to allow it  to be used in subclasses.
    */
   protected static final Logger logger = LoggerFactory.getLogger(GerritQueryHandlerHttp.class);
-
-  private final String getAllRevisions = "&o=ALL_REVISIONS";
-  private final String getCurrentRevision = "&o=CURRENT_REVISION";
-  private final String getCurrentFiles = "&o=CURRENT_FILES";
-  private final String getCurrentCommit = "&o=CURRENT_COMMIT";
-  private final String getMessages = "&o=MESSAGES";
 
   /**
    * The base of the query HTTP command to send to Gerrit.
@@ -60,17 +57,6 @@ public class GerritQueryHandlerHttp {
     this.httpBaseUrl = frontEndUrl;
     this.credential = credential;
     this.proxy = gerritProxy;
-  }
-
-  /**
-   * Creates a GerritQueryHandlerHTTP with the specified config.
-   *
-   * @param config the RestConnectionConfig, which contains the url, credentials and proxy
-   */
-  public GerritQueryHandlerHttp(RestConnectionConfig config) {
-    this(config.getGerritFrontEndUrl(),
-        (Credential)config.getHttpCredentials(),
-        config.getGerritProxy());
   }
 
 
@@ -164,7 +150,6 @@ public class GerritQueryHandlerHttp {
       throws IOException, GerritQueryException {
 
     List<JSONObject> list = new ArrayList<>();
-
     Consumer<JSONObject> lineVisitor = list::add;
 
     runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, getComments, lineVisitor);
@@ -266,7 +251,6 @@ public class GerritQueryHandlerHttp {
       throws GerritQueryException, IOException {
 
     List<String> list = new ArrayList<>();
-
     Consumer<JSONObject> lineVisitor = (JSONObject o) -> list.add(o.toString());
 
     runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, false, lineVisitor);
@@ -298,41 +282,39 @@ public class GerritQueryHandlerHttp {
                             boolean getCommitMessage, boolean getComments, Consumer<JSONObject> lineVisitor)
       throws GerritQueryException, IOException {
 
-
     StringBuilder str = new StringBuilder(httpBaseUrl);
-
     str.append("/a/changes/?q=").append(queryString);
 
     // map the cl-arguments from: https://gerrit-review.googlesource.com/Documentation/cmd-query.html
-    // to Rest-API-arguments:          https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html
+    // to Rest-API-arguments:     https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html
 
     if (getPatchSets) {
       //ALL_REVISIONS: describe all revisions, not just current.
-      str.append(getAllRevisions);
+      str.append(GET_ALL_REVISIONS);
     }
     if (getCurrentPatchSet) {
-      //.append(" --current-patch-set");
+      //"--current-patch-set"
       //CURRENT_REVISION: describe the current revision (patch set) of the change, including the commit SHA-1 and URLs
       //to fetch from.
-      str.append(getCurrentRevision);
+      str.append(GET_CURRENT_REVISION);
     }
     if (getFiles && (getCurrentPatchSet || getPatchSets)) {
-      //str.append(" --files");
+      //"--files"
       //CURRENT_FILES: list files modified by the commit and magic files, including basic line counts inserted/deleted
       //per file.
       // Only valid when the CURRENT_REVISION or ALL_REVISIONS option is selected.
-      str.append(getCurrentFiles);
+      str.append(GET_CURRENT_FILES);
     }
     if (getCommitMessage && (getCurrentPatchSet || getPatchSets)) {
-      //str.append(" --commit-message");
+      //"--commit-message"
       //CURRENT_COMMITS: parse and output all header fields from the commit object, including message.
       // Only valid when the CURRENT_REVISION or ALL_REVISIONS option is selected.
-      str.append(getCurrentCommit);
+      str.append(GET_CURRENT_COMMIT);
     }
     if (getComments) {
-      //str.append(" --comments");
+      //"--comments"
       //MESSAGES: include messages associated with the change.
-      str.append(getMessages);
+      str.append(GET_MESSAGES);
     }
 
     logger.debug("sending: " + str);
@@ -344,35 +326,31 @@ public class GerritQueryHandlerHttp {
     logger.debug("Status received: " + response.getStatusLine());
 
     switch(response.statusCode()) {
-      case statusOk:
+      case STATUS_OK:
         logger.debug("Body received: " + response.body().asPrettyString());
         break;
 
-      case statusBadRequest:
+      case STATUS_BAD_REQUEST:
         logger.error(httpBaseUrl + ": Bad request " + "(400)");
         throw new GerritQueryException(str + ": Bad request " + "(400)");
 
-      case statusBadCredentials:
+      case STATUS_BAD_CREDENTIALS:
         logger.error("Unable to authenticate to \"" + httpBaseUrl + "\"");
-        throw new IOException("Error connecting to \"" + httpBaseUrl + "\": " + "(401)");
+        throw new IOException("Error connecting to \"" + httpBaseUrl + "\" " + "(401)");
 
-      case statusNotFound:
+      case STATUS_NOT_FOUND:
         logger.error("\"" + httpBaseUrl + "\": Could not be found! (404)");
-        throw new IOException("Error connecting to \"" + httpBaseUrl + "\": " + "(404)");
+        throw new IOException("Error connecting to \"" + httpBaseUrl + "\" " + "(404)");
 
       default:
         logger.error("Error connecting to \"" + httpBaseUrl + "\"! (" + response.statusCode() + ")");
-        throw new IOException("Error connecting to \"" + httpBaseUrl + "\"! (" + response.statusCode() + ")");
+        throw new IOException("Error connecting to \"" + httpBaseUrl + "\" (" + response.statusCode() + ")");
     }
 
-    //removing XSSI-Chars
-    String body = response.body().asString().split("\\r?\\n|\\r")[1];
-
+    String body = response.body().asString().split("\\r?\\n|\\r")[1]; //removing XSSI-Chars
     JSONArray jsonArray = JSONArray.fromObject(body);
 
-    for (int i = 0; i < jsonArray.size(); i++) {
-      lineVisitor.accept(jsonArray.getJSONObject(i));
-    }
+    jsonArray.forEach(v -> lineVisitor.accept((JSONObject) v));
   }
 
   @Override

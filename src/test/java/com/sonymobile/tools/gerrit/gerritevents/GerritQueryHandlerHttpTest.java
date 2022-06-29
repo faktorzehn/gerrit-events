@@ -46,8 +46,6 @@ public class GerritQueryHandlerHttpTest {
 
     private final String password = "password123";
 
-    private Credentials credentials;
-
     private GerritQueryHandlerHttp gerritQueryHandlerHTTP;
 
     private WireMockServer wireMockServer;
@@ -96,33 +94,6 @@ public class GerritQueryHandlerHttpTest {
     }
 
     /**
-     * debug.
-     */
-    public void debug() {
-        //debugStub();
-        setupQueryHandlerHttp();
-        /*
-        given().auth().preemptive().basic(credentials.getUserPrincipal().getName(), credentials.getPassword())
-            .when().get("https://gerrit.faktorzehn.de/a/changes/?q=limit%3A1&o=ALL_REVISIONS&o=CURRENT_REVI
-            SION&o=CURRENT_FILES&o=CURRENT_COMMITS&o=MESSAGES").then()
-            .assertThat().statusCode(200);
-         */
-
-/*
-        try {
-            Response response = gerritQueryHandlerHTTP.runQuery("limit:2", true, true, true, true, true);
-            System.out.println();
-            String s = response.body().asPrettyString();
-            System.out.println(s);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (GerritQueryException e) {
-            e.printStackTrace();
-        }
- */
-    }
-
-    /**
      * setup stub for {@link GerritQueryHandlerHttpTest#urlConversionTest()}, which can be found at url + query.
      * @param query a String added to url
      */
@@ -131,7 +102,7 @@ public class GerritQueryHandlerHttpTest {
         wireMockServer.stubFor(get(urlEqualTo(query))
             .withBasicAuth(username, password)
             .willReturn(aResponse().withHeader("Content-Type", "text/plain")
-                .withStatus(GerritQueryHandlerHttp.statusOk)
+                .withStatus(GerritQueryHandlerHttp.STATUS_OK)
                 .withBody(")]}'\n []")));
     }
 
@@ -144,7 +115,7 @@ public class GerritQueryHandlerHttpTest {
         wireMockServer.stubFor(get(urlEqualTo("/a/changes/?q=x&o=ALL_REVISIONS&o=CURRENT_REVISION"))
             .withBasicAuth(username, password)
             .willReturn(aResponse().withHeader("Content-Type", "text/plain")
-                .withStatus(GerritQueryHandlerHttp.statusOk)
+                .withStatus(GerritQueryHandlerHttp.STATUS_OK)
                 .withBodyFile(fileName)));
     }
 
@@ -341,8 +312,6 @@ public class GerritQueryHandlerHttpTest {
         List<String> response1 = gerritQueryHandlerHTTP.queryJson("x");
         assertEquals("{\"Id\":\"value1\"}", response1.get(0));
         assertEquals("{\"Id\":\"value2\"}", response1.get(1));
-
-
     }
 
     /**
@@ -352,7 +321,7 @@ public class GerritQueryHandlerHttpTest {
     public void invalidRequestsThrowsTest() {
 
         //Statuscode 200
-        setupStubForInvalidRequests(GerritQueryHandlerHttp.statusOk);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_OK);
         try {
             gerritQueryHandlerHTTP.queryJava("x");
         } catch (Exception e) {
@@ -360,7 +329,7 @@ public class GerritQueryHandlerHttpTest {
         }
 
         //Statuscode 400
-        setupStubForInvalidRequests(GerritQueryHandlerHttp.statusBadRequest);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_BAD_REQUEST);
         //assertThrows(IOException.class, () -> gerritQueryHandlerHTTP.queryJava("x"));
         try {
             gerritQueryHandlerHTTP.queryJava("x");
@@ -372,7 +341,7 @@ public class GerritQueryHandlerHttpTest {
         }
 
         //Statuscode 401
-        setupStubForInvalidRequests(GerritQueryHandlerHttp.statusBadCredentials);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_BAD_CREDENTIALS);
         //assertThrows(IOException.class, () -> gerritQueryHandlerHTTP.queryJava("x"));
         try {
             gerritQueryHandlerHTTP.queryJava("x");
@@ -384,7 +353,7 @@ public class GerritQueryHandlerHttpTest {
         }
 
         //Statuscode 404
-        setupStubForInvalidRequests(GerritQueryHandlerHttp.statusNotFound);
+        setupStubForInvalidRequests(GerritQueryHandlerHttp.STATUS_NOT_FOUND);
         //assertThrows(IOException.class, () -> gerritQueryHandlerHTTP.queryJava("x"));
         try {
             gerritQueryHandlerHTTP.queryJava("x");
