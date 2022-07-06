@@ -20,3 +20,10 @@ jobs:
 
     - name: Build project with Maven
       run: mvn -B package --file pom.xml
+
+    - name: Upload action artifacts
+        uses: actions/upload-artifact@master
+        with:
+          name: package artifacts
+          path: |
+            target/*.jar
