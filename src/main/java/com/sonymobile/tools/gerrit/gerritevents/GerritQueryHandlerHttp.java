@@ -360,7 +360,7 @@ public class GerritQueryHandlerHttp {
 
     //jsonArray.forEach(v -> lineVisitor.accept((JSONObject) v));
     for (Object element : jsonArray) {
-        lineVisitor.accept((JSONObject) element);
+        lineVisitor.accept((JSONObject)element);
     }
   }
 
