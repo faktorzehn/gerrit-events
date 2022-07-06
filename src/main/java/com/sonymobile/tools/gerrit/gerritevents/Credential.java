@@ -3,7 +3,7 @@ package com.sonymobile.tools.gerrit.gerritevents;
 import java.security.Principal;
 
 /**
- * The interface which GerritQueryHandlerHttp uses for authentication
+ * The interface, which GerritQueryHandlerHttp uses for authentication.
  */
 public interface Credential {
 

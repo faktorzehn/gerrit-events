@@ -26,11 +26,11 @@ public class GerritQueryHandlerHttp {
   static final int STATUS_BAD_REQUEST = 400;
   static final int STATUS_BAD_CREDENTIALS = 401;
   static final int STATUS_NOT_FOUND = 404;
-  private final String GET_ALL_REVISIONS = "&o=ALL_REVISIONS";
-  private final String GET_CURRENT_REVISION = "&o=CURRENT_REVISION";
-  private final String GET_CURRENT_FILES = "&o=CURRENT_FILES";
-  private final String GET_CURRENT_COMMIT = "&o=CURRENT_COMMIT";
-  private final String GET_MESSAGES = "&o=MESSAGES";
+  static final String GET_ALL_REVISIONS = "&o=ALL_REVISIONS";
+  static final String GET_CURRENT_REVISION = "&o=CURRENT_REVISION";
+  static final String GET_CURRENT_FILES = "&o=CURRENT_FILES";
+  static final String GET_CURRENT_COMMIT = "&o=CURRENT_COMMIT";
+  static final String GET_MESSAGES = "&o=MESSAGES";
 
   /**
    * Logger instance.
@@ -150,8 +150,12 @@ public class GerritQueryHandlerHttp {
       throws IOException, GerritQueryException {
 
     List<JSONObject> list = new ArrayList<>();
-    Consumer<JSONObject> lineVisitor = list::add;
-
+    Consumer<JSONObject> lineVisitor = new Consumer<JSONObject>() {
+      @Override
+      public void accept(JSONObject jsonObject) {
+        list.add(jsonObject);
+      }
+    };
     runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, getComments, lineVisitor);
     return list;
   }
@@ -251,8 +255,12 @@ public class GerritQueryHandlerHttp {
       throws GerritQueryException, IOException {
 
     List<String> list = new ArrayList<>();
-    Consumer<JSONObject> lineVisitor = (JSONObject o) -> list.add(o.toString());
-
+    Consumer<JSONObject> lineVisitor = new Consumer<JSONObject>() {
+      @Override
+      public void accept(JSONObject jsonObject) {
+        list.add(jsonObject.toString());
+      }
+    };
     runQuery(queryString, getPatchSets, getCurrentPatchSet, getFiles, getCommitMessage, false, lineVisitor);
     return list;
   }
@@ -274,7 +282,7 @@ public class GerritQueryHandlerHttp {
    *                           Meaning if --commit-message should be appended to the command call.
    * @param getComments        if patchset comments should be included in the results.
    *                           Meaning if --comments should be appended to the command call.
-   *                           //@param visitor the visitor to handle each line in the result.
+   * @param lineVisitor the visitor to handle each line in the result.
    * @throws GerritQueryException if a visitor finds that Gerrit reported an error with the query.
    * @throws IOException          for some other IO problem.
    */
@@ -350,7 +358,10 @@ public class GerritQueryHandlerHttp {
     String body = response.body().asString().split("\\r?\\n|\\r")[1]; //removing XSSI-Chars
     JSONArray jsonArray = JSONArray.fromObject(body);
 
-    jsonArray.forEach(v -> lineVisitor.accept((JSONObject) v));
+    //jsonArray.forEach(v -> lineVisitor.accept((JSONObject) v));
+    for (Object element : jsonArray) {
+        lineVisitor.accept((JSONObject) element);
+    }
   }
 
   @Override

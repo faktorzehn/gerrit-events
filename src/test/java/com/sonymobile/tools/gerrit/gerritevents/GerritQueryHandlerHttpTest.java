@@ -3,7 +3,6 @@ package com.sonymobile.tools.gerrit.gerritevents;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import net.sf.json.JSONObject;
-import org.apache.http.auth.Credentials;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
