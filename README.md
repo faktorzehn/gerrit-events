@@ -1,5 +1,16 @@
-Gerrit Events
+Gerrit Events[![Release Drafter](https://github.com/faktorzehn/gerrit-events/actions/workflows/release-drafter.yml/badge.svg)](https://github.com/faktorzehn/gerrit-events/actions/workflows/release-drafter.yml) [![Java CI with Maven](https://github.com/faktorzehn/gerrit-events/actions/workflows/maven.yml/badge.svg)](https://github.com/faktorzehn/gerrit-events/actions/workflows/maven.yml)
 =============
+
+**This library is primarily intended as a dependency for our fork of the [jira-gerrit-plugin](https://github.com/faktorzehn/jira-gerrit-plugin).**
+It adds support for fetching changes from Gerrit's rest-api through a ``GerritQueryHandlerHttp``-class. This class closely follows
+the structure of the already existing ``GerritQueryHandler``- and ``GerritQueryHandlerWithPersistedConnection``-class.
+The added functionality is fully tested.
+
+
+- - - -
+- - - -
+
+
 This is a Java library used primarily to listen to [stream-events](https://gerrit-documentation.storage.googleapis.com/Documentation/2.8.1/cmd-stream-events.html) from [Gerrit Code Review](https://code.google.com/p/gerrit/) and to send reviews via the SSH CLI or the REST API.
 It was originally a module in the [Jenkins Gerrit Trigger plugin](https://github.com/jenkinsci/gerrit-trigger-plugin) and is now broken out to be used in other tools without the dependency to Jenkins.
 
